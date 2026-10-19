@@ -10,6 +10,7 @@ fn print_help() {
     println!("  --schema FILE   schema file (default .env.schema)");
     println!("  --env FILE      env file (default .env; missing file is ok)");
     println!("  --print         print resolved values");
+    println!("  --version       print version and exit");
     println!("  -h, --help      show this help");
 }
 
@@ -29,6 +30,9 @@ fn main() {
                 }
                 schema_path = args[i].clone();
             }
+            arg if arg.starts_with("--schema=") => {
+                schema_path = arg["--schema=".len()..].to_string();
+            }
             "--env" => {
                 i += 1;
                 if i >= args.len() {
@@ -37,7 +41,14 @@ fn main() {
                 }
                 env_path = args[i].clone();
             }
+            arg if arg.starts_with("--env=") => {
+                env_path = arg["--env=".len()..].to_string();
+            }
             "--print" => print = true,
+            "--version" => {
+                println!("envguard {}", env!("CARGO_PKG_VERSION"));
+                return;
+            }
             "-h" | "--help" => {
                 print_help();
                 return;

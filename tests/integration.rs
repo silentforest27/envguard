@@ -59,3 +59,34 @@ fn invalid_type_fails() {
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(stderr.contains("PORT"));
 }
+
+#[test]
+fn required_default_is_rejected() {
+    let dir = tmpdir("required-default");
+    fs::write(dir.join(".env.schema"), "FOO required string default\n").unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_envguard"))
+        .arg("--schema")
+        .arg(dir.join(".env.schema"))
+        .arg("--env")
+        .arg(dir.join(".env"))
+        .output()
+        .unwrap();
+    assert!(!out.status.success());
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("default"));
+}
+
+#[test]
+fn schema_option_equals_form() {
+    let dir = tmpdir("equals");
+    fs::write(dir.join(".env.schema"), "PORT optional port 8080\n").unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_envguard"))
+        .arg(format!("--schema={}", dir.join(".env.schema").display()))
+        .arg(format!("--env={}", dir.join(".env").display()))
+        .arg("--version")
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.starts_with("envguard "));
+}

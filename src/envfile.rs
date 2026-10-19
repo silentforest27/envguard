@@ -13,8 +13,11 @@ pub fn load_dotenv(path: &Path) -> Result<BTreeMap<String, String>, String> {
         if line.is_empty() || line.starts_with('#') {
             continue;
         }
-        if let Some(rest) = line.strip_prefix("export ") {
-            line = rest.trim();
+        if let Some(rest) = line.strip_prefix("export") {
+            let trimmed = rest.trim_start();
+            if !trimmed.is_empty() && trimmed.len() < rest.len() {
+                line = trimmed;
+            }
         }
         let (key, value) = line
             .split_once('=')
@@ -60,5 +63,18 @@ mod tests {
         let _ = fs::remove_file(&p);
         let m = load_dotenv(&p).unwrap();
         assert!(m.is_empty());
+    }
+
+    #[test]
+    fn export_with_extra_whitespace() {
+        let dir = std::env::temp_dir();
+        let p = dir.join("envguard-export-whitespace.env");
+        let mut f = fs::File::create(&p).unwrap();
+        writeln!(f, "export   FOO=bar").unwrap();
+        writeln!(f, "export\tBAZ=qux").unwrap();
+        let m = load_dotenv(&p).unwrap();
+        assert_eq!(m.get("FOO").unwrap(), "bar");
+        assert_eq!(m.get("BAZ").unwrap(), "qux");
+        let _ = fs::remove_file(&p);
     }
 }

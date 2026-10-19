@@ -66,6 +66,13 @@ impl Schema {
                 }
             };
             let default = if parts.len() >= 4 {
+                if required {
+                    return Err(format!(
+                        "line {}: default value not allowed for required variable '{}'",
+                        lineno + 1,
+                        name
+                    ));
+                }
                 Some(parts[3..].join(" "))
             } else {
                 None
@@ -119,6 +126,12 @@ mod tests {
     #[test]
     fn too_few_fields_errors() {
         let r = Schema::parse("FOO optional\n");
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn required_default_errors() {
+        let r = Schema::parse("FOO required string default\n");
         assert!(r.is_err());
     }
 }
