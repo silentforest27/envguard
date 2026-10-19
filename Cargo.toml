@@ -1,0 +1,16 @@
+[package]
+name = "envguard"
+version = "0.1.0"
+edition = "2021"
+description = "Validate environment variables against a declarative schema"
+license = "MIT"
+
+[dependencies]
+
+[[bin]]
+name = "envguard"
+path = "src/main.rs"
+
+[lib]
+name = "envguard"
+path = "src/lib.rs"
