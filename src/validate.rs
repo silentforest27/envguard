@@ -19,18 +19,32 @@ pub fn check_type(ty: &VarType, value: &str) -> Result<(), String> {
             _ => Err(format!("invalid value {:?}: expected bool", value)),
         },
         VarType::Url => {
-            if let Some((scheme, rest)) = value.split_once("://") {
-                if !scheme.is_empty()
-                    && !rest.is_empty()
-                    && !value.contains(char::is_whitespace)
-                {
-                    Ok(())
-                } else {
-                    Err(format!("invalid value {:?}: expected url", value))
-                }
-            } else {
-                Err(format!("invalid value {:?}: expected url", value))
+            let (scheme, rest) = value
+                .split_once("://")
+                .ok_or_else(|| format!("invalid value {:?}: expected url", value))?;
+            let scheme_ok = !scheme.is_empty()
+                && scheme
+                    .chars()
+                    .next()
+                    .map(char::is_ascii_alphabetic)
+                    .unwrap_or(false)
+                && scheme.chars().all(|c| {
+                    c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.' | '_')
+                });
+            if !scheme_ok
+                || rest.is_empty()
+                || value.contains(char::is_whitespace)
+            {
+                return Err(format!("invalid value {:?}: expected url", value));
             }
+            let authority = rest
+                .split(|c| c == '/' || c == '?' || c == '#')
+                .next()
+                .unwrap_or(rest);
+            if authority.is_empty() {
+                return Err(format!("invalid value {:?}: expected url", value));
+            }
+            Ok(())
         }
         VarType::Port => {
             let n: u32 = value
@@ -89,7 +103,7 @@ mod tests {
 
     #[test]
     fn missing_required() {
-        let s = Schema::parse("API_KEY required string\n").unwrap();
+        let s = Schema::parse("API_KEY required string").unwrap();
         let env = BTreeMap::new();
         let issues = validate(&s, &env);
         assert_eq!(issues.len(), 1);
@@ -98,7 +112,7 @@ mod tests {
 
     #[test]
     fn default_used() {
-        let s = Schema::parse("PORT optional port 8080\n").unwrap();
+        let s = Schema::parse("PORT optional port 8080").unwrap();
         let env = BTreeMap::new();
         let issues = validate(&s, &env);
         assert!(issues.is_empty());
@@ -106,7 +120,7 @@ mod tests {
 
     #[test]
     fn type_mismatch() {
-        let s = Schema::parse("PORT optional port 8080\n").unwrap();
+        let s = Schema::parse("PORT optional port 8080").unwrap();
         let mut env = BTreeMap::new();
         env.insert("PORT".into(), "abc".into());
         let issues = validate(&s, &env);
@@ -115,7 +129,8 @@ mod tests {
 
     #[test]
     fn bool_and_url_ok() {
-        let s = Schema::parse("D required url\nB required bool\n").unwrap();
+        let s = Schema::parse(r#"D required url
+B required bool"#).unwrap();
         let mut env = BTreeMap::new();
         env.insert("D".into(), "https://x/y".into());
         env.insert("B".into(), "true".into());
@@ -124,7 +139,7 @@ mod tests {
 
     #[test]
     fn url_requires_scheme_and_nonempty_value() {
-        let s = Schema::parse("U required url\n").unwrap();
+        let s = Schema::parse("U required url").unwrap();
         for value in ["://host", "http://", "not-a-url", "http://example.com/path with space"] {
             let mut env = BTreeMap::new();
             env.insert("U".into(), value.into());
