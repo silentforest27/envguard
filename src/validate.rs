@@ -19,8 +19,15 @@ pub fn check_type(ty: &VarType, value: &str) -> Result<(), String> {
             _ => Err(format!("invalid value {:?}: expected bool", value)),
         },
         VarType::Url => {
-            if value.contains("://") && value.split("://").nth(1).map(|s| !s.is_empty()).unwrap_or(false) {
-                Ok(())
+            if let Some((scheme, rest)) = value.split_once("://") {
+                if !scheme.is_empty()
+                    && !rest.is_empty()
+                    && !value.contains(char::is_whitespace)
+                {
+                    Ok(())
+                } else {
+                    Err(format!("invalid value {:?}: expected url", value))
+                }
             } else {
                 Err(format!("invalid value {:?}: expected url", value))
             }
@@ -112,6 +119,19 @@ mod tests {
         let mut env = BTreeMap::new();
         env.insert("D".into(), "https://x/y".into());
         env.insert("B".into(), "true".into());
+        assert!(validate(&s, &env).is_empty());
+    }
+
+    #[test]
+    fn url_requires_scheme_and_nonempty_value() {
+        let s = Schema::parse("U required url\n").unwrap();
+        for value in ["://host", "http://", "not-a-url", "http://example.com/path with space"] {
+            let mut env = BTreeMap::new();
+            env.insert("U".into(), value.into());
+            assert!(!validate(&s, &env).is_empty(), "{} should be invalid", value);
+        }
+        let mut env = BTreeMap::new();
+        env.insert("U".into(), "https://example.com/path".into());
         assert!(validate(&s, &env).is_empty());
     }
 }

@@ -26,6 +26,7 @@ pub struct Schema {
 
 impl Schema {
     pub fn parse(text: &str) -> Result<Self, String> {
+        let text = text.strip_prefix('\u{feff}').unwrap_or(text);
         let mut vars = Vec::new();
         let mut seen = BTreeSet::new();
         for (lineno, raw) in text.lines().enumerate() {
@@ -133,5 +134,12 @@ mod tests {
     fn required_default_errors() {
         let r = Schema::parse("FOO required string default\n");
         assert!(r.is_err());
+    }
+
+    #[test]
+    fn strips_byte_order_mark() {
+        let s = Schema::parse("\u{feff}FOO optional string\n").unwrap();
+        assert_eq!(s.vars.len(), 1);
+        assert_eq!(s.vars[0].name, "FOO");
     }
 }

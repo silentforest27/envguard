@@ -74,6 +74,7 @@ envguard [--schema FILE] [--env FILE] [--print]
 - `--schema FILE`  schema file (default `.env.schema`)
 - `--env FILE`     env file (default `.env`; missing file is not an error)
 - `--print`        print resolved values (name=value or name=<unset>)
+- `--version`      print version and exit
 - `-h, --help`     show help
 
 ### Library usage
@@ -93,7 +94,7 @@ assert!(issues.is_empty());
 
 ```
 cargo build
- cargo test
+cargo test
 ```
 
 No external dependencies are required.

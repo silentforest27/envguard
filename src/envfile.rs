@@ -8,6 +8,7 @@ pub fn load_dotenv(path: &Path) -> Result<BTreeMap<String, String>, String> {
         return Ok(map);
     }
     let text = fs::read_to_string(path).map_err(|e| format!("{}: {}", path.display(), e))?;
+    let text = text.strip_prefix('\u{feff}').unwrap_or(&text);
     for (lineno, raw) in text.lines().enumerate() {
         let mut line = raw.trim();
         if line.is_empty() || line.starts_with('#') {
@@ -75,6 +76,39 @@ mod tests {
         let m = load_dotenv(&p).unwrap();
         assert_eq!(m.get("FOO").unwrap(), "bar");
         assert_eq!(m.get("BAZ").unwrap(), "qux");
+        let _ = fs::remove_file(&p);
+    }
+
+    #[test]
+    fn strips_byte_order_mark() {
+        let dir = std::env::temp_dir();
+        let p = dir.join("envguard-bom.env");
+        fs::write(&p, "\u{feff}FOO=bar\n").unwrap();
+        let m = load_dotenv(&p).unwrap();
+        assert_eq!(m.get("FOO").unwrap(), "bar");
+        let _ = fs::remove_file(&p);
+    }
+
+    #[test]
+    fn export_prefix_requires_word_boundary() {
+        let dir = std::env::temp_dir();
+        let p = dir.join("envguard-export-boundary.env");
+        fs::write(&p, "exportFOO=bar\nexport BAR=baz\n").unwrap();
+        let m = load_dotenv(&p).unwrap();
+        assert_eq!(m.get("exportFOO").unwrap(), "bar");
+        assert_eq!(m.get("BAR").unwrap(), "baz");
+        assert!(!m.contains_key("FOO"));
+        let _ = fs::remove_file(&p);
+    }
+
+    #[test]
+    fn quoted_value_with_spaces() {
+        let dir = std::env::temp_dir();
+        let p = dir.join("envguard-quoted-spaces.env");
+        fs::write(&p, "FOO=\"hello world\"\nBAR='x y'\n").unwrap();
+        let m = load_dotenv(&p).unwrap();
+        assert_eq!(m.get("FOO").unwrap(), "hello world");
+        assert_eq!(m.get("BAR").unwrap(), "x y");
         let _ = fs::remove_file(&p);
     }
 }
