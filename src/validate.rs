@@ -10,10 +10,17 @@ pub struct Issue {
 pub fn check_type(ty: &VarType, value: &str) -> Result<(), String> {
     match ty {
         VarType::String => Ok(()),
-        VarType::Int => value
-            .parse::<i64>()
-            .map(|_| ())
-            .map_err(|_| format!("invalid value {:?}: expected int", value)),
+        VarType::Int => {
+            let chars_ok = !value.is_empty()
+                && value.bytes().iter().enumerate().all(|(i, &b)| {
+                    b.is_ascii_digit() || (i == 0 && (b == b'+' || b == b'-'))
+                });
+            if chars_ok && value.parse::<i64>().is_ok() {
+                Ok(())
+            } else {
+                Err(format!("invalid value {:?}: expected int", value))
+            }
+        }
         VarType::Bool => match value.to_lowercase().as_str() {
             "true" | "false" | "1" | "0" | "yes" | "no" => Ok(()),
             _ => Err(format!("invalid value {:?}: expected bool", value)),
@@ -44,9 +51,24 @@ pub fn check_type(ty: &VarType, value: &str) -> Result<(), String> {
             if authority.is_empty() {
                 return Err(format!("invalid value {:?}: expected url", value));
             }
+            let host_part = match authority.rfind('@') {
+                Some(i) => &authority[i + 1..],
+                None => authority,
+            };
+            let host = if let Some(after_bracket) = host_part.strip_prefix('[') {
+                after_bracket.split(']').next().unwrap_or("")
+            } else {
+                host_part.split(':').next().unwrap_or(host_part)
+            };
+            if host.is_empty() {
+                return Err(format!("invalid value {:?}: expected url", value));
+            }
             Ok(())
         }
         VarType::Port => {
+            if value.is_empty() || !value.bytes().all(u8::is_ascii_digit) {
+                return Err(format!("invalid value {:?}: expected port (1-65535)", value));
+            }
             let n: u32 = value
                 .parse()
                 .map_err(|_| format!("invalid value {:?}: expected port (1-65535)", value))?;
@@ -140,7 +162,13 @@ B required bool"#).unwrap();
     #[test]
     fn url_requires_scheme_and_nonempty_value() {
         let s = Schema::parse("U required url").unwrap();
-        for value in ["://host", "http://", "not-a-url", "http://example.com/path with space"] {
+        for value in [
+            "://host",
+            "http://",
+            "not-a-url",
+            "http://example.com/path with space",
+            "http://:8080",
+        ] {
             let mut env = BTreeMap::new();
             env.insert("U".into(), value.into());
             assert!(!validate(&s, &env).is_empty(), "{} should be invalid", value);
