@@ -73,6 +73,9 @@ pub fn check_type(ty: &VarType, value: &str) -> Result<(), String> {
                 let port = if remainder.is_empty() {
                     ""
                 } else if let Some(stripped) = remainder.strip_prefix(':') {
+                    if stripped.is_empty() {
+                        return Err(format!("invalid value {:?}: expected url", value));
+                    }
                     stripped
                 } else {
                     return Err(format!("invalid value {:?}: expected url", value));
@@ -86,7 +89,7 @@ pub fn check_type(ty: &VarType, value: &str) -> Result<(), String> {
             } else if let Some(colon) = host_part.rfind(':') {
                 let host = &host_part[..colon];
                 let port = &host_part[colon + 1..];
-                if host.is_empty() || host.contains(':') {
+                if host.is_empty() || host.contains(':') || port.is_empty() {
                     return Err(format!("invalid value {:?}: expected url", value));
                 }
                 (host, port)
