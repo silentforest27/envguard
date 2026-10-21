@@ -44,24 +44,69 @@ pub fn check_type(ty: &VarType, value: &str) -> Result<(), String> {
             {
                 return Err(format!("invalid value {:?}: expected url", value));
             }
-            let authority = rest
-                .split(|c| c == '/' || c == '?' || c == '#')
-                .next()
-                .unwrap_or(rest);
+            let authority_end = rest
+                .find(|c| c == '/' || c == '?' || c == '#')
+                .unwrap_or(rest.len());
+            let authority = &rest[..authority_end];
             if authority.is_empty() {
                 return Err(format!("invalid value {:?}: expected url", value));
             }
+
             let host_part = match authority.rfind('@') {
+                Some(0) => {
+                    return Err(format!("invalid value {:?}: expected url", value))
+                }
                 Some(i) => &authority[i + 1..],
                 None => authority,
             };
-            let host = if let Some(after_bracket) = host_part.strip_prefix('[') {
-                after_bracket.split(']').next().unwrap_or("")
+            if host_part.is_empty() {
+                return Err(format!("invalid value {:?}: expected url", value));
+            }
+
+            let (host, port) = if let Some(after_bracket) = host_part.strip_prefix('[') {
+                let close = match after_bracket.find(']') {
+                    Some(i) if i > 0 => i,
+                    _ => return Err(format!("invalid value {:?}: expected url", value)),
+                };
+                let host = &after_bracket[..close];
+                let remainder = &after_bracket[close + 1..];
+                let port = if remainder.is_empty() {
+                    ""
+                } else if let Some(stripped) = remainder.strip_prefix(':') {
+                    stripped
+                } else {
+                    return Err(format!("invalid value {:?}: expected url", value));
+                };
+                if !host.chars().all(|c| c.is_ascii_hexdigit() || c == ':')
+                    || !host.contains(':')
+                {
+                    return Err(format!("invalid value {:?}: expected url", value));
+                }
+                (host, port)
+            } else if let Some(colon) = host_part.rfind(':') {
+                let host = &host_part[..colon];
+                let port = &host_part[colon + 1..];
+                if host.is_empty() || host.contains(':') {
+                    return Err(format!("invalid value {:?}: expected url", value));
+                }
+                (host, port)
             } else {
-                host_part.split(':').next().unwrap_or(host_part)
+                (host_part, "")
             };
+
             if host.is_empty() {
                 return Err(format!("invalid value {:?}: expected url", value));
+            }
+            if !port.is_empty() {
+                if !port.bytes().all(u8::is_ascii_digit) {
+                    return Err(format!("invalid value {:?}: expected url", value));
+                }
+                let n: u32 = port
+                    .parse()
+                    .map_err(|_| format!("invalid value {:?}: expected url", value))?;
+                if !(1..=65535).contains(&n) {
+                    return Err(format!("invalid value {:?}: expected url", value));
+                }
             }
             Ok(())
         }
@@ -176,5 +221,37 @@ B required bool"#).unwrap();
         let mut env = BTreeMap::new();
         env.insert("U".into(), "https://example.com/path".into());
         assert!(validate(&s, &env).is_empty());
+    }
+
+    #[test]
+    fn url_rejects_malformed_components() {
+        let s = Schema::parse("U required url").unwrap();
+        for value in [
+            "http://example.com:",
+            "http://example.com:abc",
+            "http://example.com:0",
+            "http://example.com:70000",
+            "http://[::1",
+            "http://[]",
+            "http://example.com::80",
+            "http://@example.com",
+            "http://example.com@",
+        ] {
+            let mut env = BTreeMap::new();
+            env.insert("U".into(), value.into());
+            assert!(!validate(&s, &env).is_empty(), "{} should be invalid", value);
+        }
+        for value in [
+            "http://example.com",
+            "https://example.com/path",
+            "http://[::1]:8080/path",
+            "http://[::1]",
+            "http://localhost:3000",
+            "http://127.0.0.1:8080",
+        ] {
+            let mut env = BTreeMap::new();
+            env.insert("U".into(), value.into());
+            assert!(validate(&s, &env).is_empty(), "{} should be valid", value);
+        }
     }
 }
