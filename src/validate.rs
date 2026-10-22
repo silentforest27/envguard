@@ -63,7 +63,7 @@ pub fn check_type(ty: &VarType, value: &str) -> Result<(), String> {
                 return Err(format!("invalid value {:?}: expected url", value));
             }
 
-            let (host, port) = if let Some(after_bracket) = host_part.strip_prefix('[') {
+            let (host, port, ipv6) = if let Some(after_bracket) = host_part.strip_prefix('[') {
                 let close = match after_bracket.find(']') {
                     Some(i) if i > 0 => i,
                     _ => return Err(format!("invalid value {:?}: expected url", value)),
@@ -85,19 +85,19 @@ pub fn check_type(ty: &VarType, value: &str) -> Result<(), String> {
                 {
                     return Err(format!("invalid value {:?}: expected url", value));
                 }
-                (host, port)
+                (host, port, true)
             } else if let Some(colon) = host_part.rfind(':') {
                 let host = &host_part[..colon];
                 let port = &host_part[colon + 1..];
                 if host.is_empty() || host.contains(':') || port.is_empty() {
                     return Err(format!("invalid value {:?}: expected url", value));
                 }
-                (host, port)
+                (host, port, false)
             } else {
-                (host_part, "")
+                (host_part, "", false)
             };
 
-            if host.is_empty() {
+            if host.is_empty() || !valid_host(host, ipv6) {
                 return Err(format!("invalid value {:?}: expected url", value));
             }
             if !port.is_empty() {
@@ -126,6 +126,36 @@ pub fn check_type(ty: &VarType, value: &str) -> Result<(), String> {
                 Err(format!("invalid value {:?}: expected port (1-65535)", value))
             }
         }
+    }
+}
+
+fn valid_host(host: &str, ipv6: bool) -> bool {
+    if ipv6 {
+        host.parse::<std::net::Ipv6Addr>().is_ok()
+    } else if host.split('.').count() == 4
+        && host.bytes().all(|b| b.is_ascii_digit() || b == b'.')
+    {
+        host.parse::<std::net::Ipv4Addr>().is_ok()
+    } else {
+        if host.is_empty() {
+            return false;
+        }
+        let host = host.strip_suffix('.').unwrap_or(host);
+        if host.is_empty() {
+            return false;
+        }
+        for label in host.split('.') {
+            if label.is_empty()
+                || label.starts_with('-')
+                || label.ends_with('-')
+                || !label
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+            {
+                return false;
+            }
+        }
+        true
     }
 }
 
@@ -251,6 +281,33 @@ B required bool"#).unwrap();
             "http://[::1]",
             "http://localhost:3000",
             "http://127.0.0.1:8080",
+        ] {
+            let mut env = BTreeMap::new();
+            env.insert("U".into(), value.into());
+            assert!(validate(&s, &env).is_empty(), "{} should be valid", value);
+        }
+    }
+
+    #[test]
+    fn url_rejects_malformed_hosts() {
+        let s = Schema::parse("U required url").unwrap();
+        for value in [
+            "http://example..com",
+            "http://-example.com",
+            "http://example-.com",
+            "http://.example.com",
+            "http://999.999.999.999",
+            "http:///path",
+        ] {
+            let mut env = BTreeMap::new();
+            env.insert("U".into(), value.into());
+            assert!(!validate(&s, &env).is_empty(), "{} should be invalid", value);
+        }
+        for value in [
+            "http://example.com.",
+            "http://example.com",
+            "http://a_b.example.com",
+            "http://[::1]",
         ] {
             let mut env = BTreeMap::new();
             env.insert("U".into(), value.into());
