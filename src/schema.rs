@@ -1,3 +1,4 @@
+use crate::validate::check_type;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
@@ -81,7 +82,16 @@ impl Schema {
                         name
                     ));
                 }
-                Some(parts[3..].join(" "))
+                let default_value = parts[3..].join(" ");
+                if let Err(e) = check_type(&ty, &default_value) {
+                    return Err(format!(
+                        "line {}: invalid default value for '{}': {}",
+                        lineno + 1,
+                        name,
+                        e
+                    ));
+                }
+                Some(default_value)
             } else {
                 None
             };
@@ -166,5 +176,22 @@ mod tests {
     fn invalid_name_errors() {
         assert!(Schema::parse("1FOO optional string\n").is_err());
         assert!(Schema::parse("FOO-BAR optional string\n").is_err());
+    }
+
+    #[test]
+    fn invalid_type_default_errors() {
+        assert!(Schema::parse("PORT optional port not-a-port\n").is_err());
+        assert!(Schema::parse("FLAG optional bool definitely\n").is_err());
+        assert!(Schema::parse("N optional int x\n").is_err());
+        assert!(Schema::parse("URL optional url example.com\n").is_err());
+    }
+
+    #[test]
+    fn valid_type_default_accepted() {
+        let s = Schema::parse(
+            "PORT optional port 8080\nFLAG optional bool false\nN optional int 42\nURL optional url https://example.com/path\n",
+        )
+        .unwrap();
+        assert_eq!(s.vars.len(), 4);
     }
 }

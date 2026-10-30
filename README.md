@@ -10,6 +10,7 @@ loads values from a `.env` file, and applies defaults.
 - Required and optional variables
 - Type checking: `string`, `int`, `bool`, `url`, `port`
 - Default values for optional variables
+- Default values are type-checked when the schema is parsed
 - Loads `.env` files (with optional `export` prefix and quoted values)
 - Process environment overrides `.env` values
 - Clear diagnostics and non-zero exit code on failure
