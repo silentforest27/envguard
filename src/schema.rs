@@ -42,6 +42,13 @@ impl Schema {
                 ));
             }
             let name = parts[0].to_string();
+            if !is_valid_name(&name) {
+                return Err(format!(
+                    "line {}: invalid variable name '{}'",
+                    lineno + 1,
+                    name
+                ));
+            }
             if !seen.insert(name.clone()) {
                 return Err(format!("line {}: duplicate variable '{}'", lineno + 1, name));
             }
@@ -94,6 +101,18 @@ impl Schema {
     }
 }
 
+fn is_valid_name(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .chars()
+            .next()
+            .map(|c| c.is_ascii_alphabetic() || c == '_')
+            .unwrap_or(false)
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -141,5 +160,11 @@ mod tests {
         let s = Schema::parse("\u{feff}FOO optional string\n").unwrap();
         assert_eq!(s.vars.len(), 1);
         assert_eq!(s.vars[0].name, "FOO");
+    }
+
+    #[test]
+    fn invalid_name_errors() {
+        assert!(Schema::parse("1FOO optional string\n").is_err());
+        assert!(Schema::parse("FOO-BAR optional string\n").is_err());
     }
 }
