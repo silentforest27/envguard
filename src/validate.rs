@@ -141,11 +141,12 @@ fn valid_host(host: &str, ipv6: bool) -> bool {
             return false;
         }
         let host = host.strip_suffix('.').unwrap_or(host);
-        if host.is_empty() {
+        if host.is_empty() || host.len() > 253 {
             return false;
         }
         for label in host.split('.') {
             if label.is_empty()
+                || label.len() > 63
                 || label.starts_with('-')
                 || label.ends_with('-')
                 || !label
