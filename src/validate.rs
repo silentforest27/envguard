@@ -80,7 +80,7 @@ pub fn check_type(ty: &VarType, value: &str) -> Result<(), String> {
                 } else {
                     return Err(format!("invalid value {:?}: expected url", value));
                 };
-                if !host.chars().all(|c| c.is_ascii_hexdigit() || c == ':')
+                if !host.chars().all(|c| c.is_ascii_hexdigit() || c == ':' || c == '.')
                     || !host.contains(':')
                 {
                     return Err(format!("invalid value {:?}: expected url", value));
