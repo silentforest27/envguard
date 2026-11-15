@@ -131,10 +131,37 @@ pub fn check_type(ty: &VarType, value: &str) -> Result<(), String> {
 
 fn valid_host(host: &str, ipv6: bool) -> bool {
     if ipv6 {
+        if let Some(last_colon) = host.rfind(':') {
+            let tail = &host[last_colon + 1..];
+            if tail.contains('.') {
+                let octets: Vec<&str> = tail.split('.').collect();
+                if octets.len() != 4 {
+                    return false;
+                }
+                for octet in octets {
+                    if octet.is_empty()
+                        || octet.len() > 3
+                        || !octet.bytes().all(u8::is_ascii_digit)
+                        || (octet.len() > 1 && octet.starts_with('0'))
+                    {
+                        return false;
+                    }
+                    if octet.parse::<u8>().is_err() {
+                        return false;
+                    }
+                }
+            }
+        }
         host.parse::<std::net::Ipv6Addr>().is_ok()
     } else if host.split('.').count() == 4
         && host.bytes().all(|b| b.is_ascii_digit() || b == b'.')
     {
+        if host
+            .split('.')
+            .any(|octet| octet.len() > 1 && octet.starts_with('0'))
+        {
+            return false;
+        }
         host.parse::<std::net::Ipv4Addr>().is_ok()
     } else {
         if host.is_empty() {
@@ -310,6 +337,25 @@ B required bool"#).unwrap();
             "http://a_b.example.com",
             "http://[::1]",
         ] {
+            let mut env = BTreeMap::new();
+            env.insert("U".into(), value.into());
+            assert!(validate(&s, &env).is_empty(), "{} should be valid", value);
+        }
+    }
+
+    #[test]
+    fn url_rejects_leading_zero_ip_literals() {
+        let s = Schema::parse("U required url").unwrap();
+        for value in [
+            "http://01.2.3.4",
+            "http://1.02.3.4",
+            "http://[::ffff:01.2.3.4]",
+        ] {
+            let mut env = BTreeMap::new();
+            env.insert("U".into(), value.into());
+            assert!(!validate(&s, &env).is_empty(), "{} should be invalid", value);
+        }
+        for value in ["http://1.2.3.4", "http://[::ffff:1.2.3.4]"] {
             let mut env = BTreeMap::new();
             env.insert("U".into(), value.into());
             assert!(validate(&s, &env).is_empty(), "{} should be valid", value);
