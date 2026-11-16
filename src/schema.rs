@@ -12,7 +12,7 @@ pub enum VarType {
     Port,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VarSpec {
     pub name: String,
     pub required: bool,
@@ -20,7 +20,7 @@ pub struct VarSpec {
     pub default: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Schema {
     pub vars: Vec<VarSpec>,
 }
