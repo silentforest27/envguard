@@ -52,6 +52,10 @@ pub fn check_type(ty: &VarType, value: &str) -> Result<(), String> {
                 return Err(format!("invalid value {:?}: expected url", value));
             }
 
+            if authority.matches('@').count() > 1 {
+                return Err(format!("invalid value {:?}: expected url", value));
+            }
+
             let host_part = match authority.rfind('@') {
                 Some(0) => {
                     return Err(format!("invalid value {:?}: expected url", value))
@@ -397,5 +401,13 @@ B required bool"#).unwrap();
             env.insert("U".into(), value.into());
             assert!(validate(&s, &env).is_empty(), "{} should be valid", value);
         }
+    }
+
+    #[test]
+    fn url_rejects_multiple_at_signs() {
+        let s = Schema::parse("U required url").unwrap();
+        let mut env = BTreeMap::new();
+        env.insert("U".into(), "http://user@@example.com".into());
+        assert!(!validate(&s, &env).is_empty());
     }
 }
