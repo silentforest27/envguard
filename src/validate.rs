@@ -171,7 +171,25 @@ fn valid_host(host: &str, ipv6: bool) -> bool {
         if host.is_empty() || host.len() > 253 {
             return false;
         }
-        for label in host.split('.') {
+
+        // A trailing dot does not change an IPv4 literal into an ordinary DNS
+        // name, so apply the same IPv4 checks after normalizing that dot.
+        let labels: Vec<&str> = host.split('.').collect();
+        if labels.len() == 4
+            && labels
+                .iter()
+                .all(|label| !label.is_empty() && label.bytes().all(u8::is_ascii_digit))
+        {
+            if labels
+                .iter()
+                .any(|octet| octet.len() > 1 && octet.starts_with('0'))
+            {
+                return false;
+            }
+            return host.parse::<std::net::Ipv4Addr>().is_ok();
+        }
+
+        for label in labels {
             if label.is_empty()
                 || label.len() > 63
                 || label.starts_with('-')
@@ -356,6 +374,25 @@ B required bool"#).unwrap();
             assert!(!validate(&s, &env).is_empty(), "{} should be invalid", value);
         }
         for value in ["http://1.2.3.4", "http://[::ffff:1.2.3.4]"] {
+            let mut env = BTreeMap::new();
+            env.insert("U".into(), value.into());
+            assert!(validate(&s, &env).is_empty(), "{} should be valid", value);
+        }
+    }
+
+    #[test]
+    fn url_rejects_leading_zero_and_invalid_ipv4_with_trailing_dot() {
+        let s = Schema::parse("U required url").unwrap();
+        for value in [
+            "http://01.2.3.4./path",
+            "http://1.02.3.4./path",
+            "http://999.999.999.999./path",
+        ] {
+            let mut env = BTreeMap::new();
+            env.insert("U".into(), value.into());
+            assert!(!validate(&s, &env).is_empty(), "{} should be invalid", value);
+        }
+        for value in ["http://1.2.3.4./path", "http://01.example.com./path"] {
             let mut env = BTreeMap::new();
             env.insert("U".into(), value.into());
             assert!(validate(&s, &env).is_empty(), "{} should be valid", value);
