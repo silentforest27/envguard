@@ -29,7 +29,8 @@ API_KEY required string
 MAX_RETRIES optional int 3
 ```
 
-Lines starting with `#` and blank lines are ignored. Duplicate variable names
+Lines starting with `#` and blank lines are ignored. Inline comments (a `#`
+preceded by whitespace) are also ignored. Duplicate variable names
 are rejected.
 
 ## Usage

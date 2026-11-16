@@ -31,8 +31,26 @@ impl Schema {
         let mut vars = Vec::new();
         let mut seen = BTreeSet::new();
         for (lineno, raw) in text.lines().enumerate() {
-            let line = raw.trim();
-            if line.is_empty() || line.starts_with('#') {
+            let mut line = raw.trim();
+            // Strip inline comments: a '#' preceded by whitespace (or at the
+            // start of the line) begins a comment, mirroring .env parsing.
+            if let Some(idx) = line.char_indices().find_map(|(i, c)| {
+                if c == '#'
+                    && (i == 0
+                        || line[..i]
+                            .chars()
+                            .last()
+                            .map(char::is_whitespace)
+                            .unwrap_or(false))
+                {
+                    Some(i)
+                } else {
+                    None
+                }
+            }) {
+                line = line[..idx].trim();
+            }
+            if line.is_empty() {
                 continue;
             }
             let parts: Vec<&str> = line.split_whitespace().collect();
@@ -139,6 +157,14 @@ mod tests {
     fn ignores_comments_and_blanks() {
         let s = Schema::parse("# c\n\nFOO optional string\n").unwrap();
         assert_eq!(s.vars.len(), 1);
+    }
+
+    #[test]
+    fn strips_inline_comments() {
+        let s = Schema::parse("PORT optional port 8080 # default port\nFOO optional string bar # trailing\n").unwrap();
+        assert_eq!(s.vars.len(), 2);
+        assert_eq!(s.vars[0].default.as_deref(), Some("8080"));
+        assert_eq!(s.vars[1].default.as_deref(), Some("bar"));
     }
 
     #[test]
