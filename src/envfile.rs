@@ -18,6 +18,9 @@ pub fn load_dotenv(path: &Path) -> Result<BTreeMap<String, String>, String> {
             let trimmed = rest.trim_start();
             if !trimmed.is_empty() && trimmed.len() < rest.len() {
                 line = trimmed;
+                if line.is_empty() || line.starts_with('#') {
+                    continue;
+                }
             }
         }
         let (key, value) = line
