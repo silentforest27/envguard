@@ -52,19 +52,25 @@ fn parse_value(input: &str, lineno: usize) -> Result<String, String> {
             .find('\'')
             .ok_or_else(|| format!("line {}: unterminated single-quoted value", lineno))?;
         let content = &rest[..end];
-        let trailing = rest[end + 1..].trim();
-        if !trailing.is_empty() && !trailing.starts_with('#') {
-            return Err(format!(
-                "line {}: unexpected trailing data after quoted value",
-                lineno
-            ));
+        let trailing_raw = &rest[end + 1..];
+        let trailing = trailing_raw.trim();
+        if !trailing.is_empty() {
+            let leading = trailing_raw.trim_start();
+            // An inline comment after a quoted value must be introduced by
+            // whitespace, just like an unquoted inline comment.
+            if !(leading.starts_with('#') && trailing_raw.len() > leading.len()) {
+                return Err(format!(
+                    "line {}: unexpected trailing data after quoted value",
+                    lineno
+                ));
+            }
         }
         Ok(content.to_string())
     } else if first == '"' {
         let mut result = String::new();
         let mut chars = trimmed[1..].chars();
         let mut closed = false;
-        let mut trailing = String::new();
+        let mut trailing_raw = String::new();
 
         while let Some(c) = chars.next() {
             if c == '\\' {
@@ -84,7 +90,7 @@ fn parse_value(input: &str, lineno: usize) -> Result<String, String> {
                 }
             } else if c == '"' {
                 closed = true;
-                trailing = chars.collect();
+                trailing_raw = chars.collect();
                 break;
             } else {
                 result.push(c);
@@ -94,12 +100,15 @@ fn parse_value(input: &str, lineno: usize) -> Result<String, String> {
         if !closed {
             return Err(format!("line {}: unterminated double-quoted value", lineno));
         }
-        let trailing = trailing.trim();
-        if !trailing.is_empty() && !trailing.starts_with('#') {
-            return Err(format!(
-                "line {}: unexpected trailing data after quoted value",
-                lineno
-            ));
+        let trailing = trailing_raw.trim();
+        if !trailing.is_empty() {
+            let leading = trailing_raw.trim_start();
+            if !(leading.starts_with('#') && trailing_raw.len() > leading.len()) {
+                return Err(format!(
+                    "line {}: unexpected trailing data after quoted value",
+                    lineno
+                ));
+            }
         }
         Ok(result)
     } else {
