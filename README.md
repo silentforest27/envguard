@@ -15,6 +15,7 @@ loads values from a `.env` file, and applies defaults.
 - Process environment overrides `.env` values
 - Clear diagnostics and non-zero exit code on failure
 - Usable as a library (`envguard` crate) or as a CLI
+- Optional machine-readable JSON output (`--json`)
 
 ## Schema format
 
@@ -70,12 +71,13 @@ API_KEY: missing required variable
 ### Options
 
 ```
-envguard [--schema FILE] [--env FILE] [--print]
+envguard [--schema FILE] [--env FILE] [--print] [--json]
 ```
 
 - `--schema FILE`  schema file (default `.env.schema`)
 - `--env FILE`     env file (default `.env`; missing file is not an error)
 - `--print`        print resolved values (name=value or name=<unset>)
+- `--json`         print a machine-readable JSON object with `ok`, `issues`, and `values`
 - `--version`      print version and exit
 - `-h, --help`     show help
 

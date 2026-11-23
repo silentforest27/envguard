@@ -90,3 +90,43 @@ fn schema_option_equals_form() {
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.starts_with("envguard "));
 }
+
+#[test]
+fn json_success() {
+    let dir = tmpdir("json-success");
+    fs::write(dir.join(".env.schema"), "PORT optional port 8080\nDB required url\n").unwrap();
+    fs::write(dir.join(".env"), "DB=https://example.com/db\n").unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_envguard"))
+        .arg("--schema")
+        .arg(dir.join(".env.schema"))
+        .arg("--env")
+        .arg(dir.join(".env"))
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("\"ok\":true"));
+    assert!(stdout.contains("\"PORT\":\"8080\""));
+    assert!(stdout.contains("\"DB\":\"https://example.com/db\""));
+}
+
+#[test]
+fn json_failure() {
+    let dir = tmpdir("json-failure");
+    fs::write(dir.join(".env.schema"), "API_KEY required string\nPORT optional port 8080\n").unwrap();
+    fs::write(dir.join(".env"), "PORT=abc\n").unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_envguard"))
+        .arg("--schema")
+        .arg(dir.join(".env.schema"))
+        .arg("--env")
+        .arg(dir.join(".env"))
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert!(!out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("\"ok\":false"));
+    assert!(stdout.contains("\"var\":\"API_KEY\""));
+    assert!(stdout.contains("\"var\":\"PORT\""));
+}
