@@ -16,7 +16,14 @@ pub fn load_dotenv(path: &Path) -> Result<BTreeMap<String, String>, String> {
         }
         if let Some(rest) = line.strip_prefix("export") {
             let trimmed = rest.trim_start();
-            if !trimmed.is_empty() && trimmed.len() < rest.len() {
+            // `export` is only a directive when whitespace separates it from
+            // the rest of the line. Lines that become blank or comments after
+            // removing that prefix are skipped, just like top-level blank and
+            // comment lines.
+            if trimmed.len() < rest.len() {
+                if trimmed.is_empty() || trimmed.starts_with('#') {
+                    continue;
+                }
                 line = trimmed;
                 if line.is_empty() || line.starts_with('#') {
                     continue;
@@ -169,6 +176,20 @@ mod tests {
         let m = load_dotenv(&p).unwrap();
         assert_eq!(m.get("FOO").unwrap(), "bar");
         assert_eq!(m.get("BAZ").unwrap(), "qux");
+        let _ = fs::remove_file(&p);
+    }
+
+    #[test]
+    fn export_reveals_blank_or_comment() {
+        let dir = std::env::temp_dir();
+        let p = dir.join("envguard-export-revealed.env");
+        let mut f = fs::File::create(&p).unwrap();
+        writeln!(f, "export   ").unwrap();
+        writeln!(f, "export\t# comment").unwrap();
+        writeln!(f, "export   FOO=bar").unwrap();
+        let m = load_dotenv(&p).unwrap();
+        assert_eq!(m.get("FOO").unwrap(), "bar");
+        assert_eq!(m.len(), 1);
         let _ = fs::remove_file(&p);
     }
 
