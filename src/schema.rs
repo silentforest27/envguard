@@ -129,6 +129,14 @@ impl Schema {
     }
 }
 
+impl std::str::FromStr for Schema {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::parse(s)
+    }
+}
+
 fn is_valid_name(name: &str) -> bool {
     !name.is_empty()
         && name
@@ -151,6 +159,14 @@ mod tests {
         assert_eq!(s.vars.len(), 2);
         assert!(s.vars[0].required);
         assert_eq!(s.vars[1].default.as_deref(), Some("8080"));
+    }
+
+    #[test]
+    fn from_str_trait() {
+        let s: Schema = "FOO optional string\nBAR required int\n".parse().unwrap();
+        assert_eq!(s.vars.len(), 2);
+        assert_eq!(s.vars[0].name, "FOO");
+        assert!(s.vars[1].required);
     }
 
     #[test]
