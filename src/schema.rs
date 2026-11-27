@@ -10,6 +10,7 @@ pub enum VarType {
     Bool,
     Url,
     Port,
+    Float,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -88,6 +89,7 @@ impl Schema {
                 "bool" => VarType::Bool,
                 "url" => VarType::Url,
                 "port" => VarType::Port,
+                "float" => VarType::Float,
                 other => {
                     return Err(format!("line {}: unknown type '{}'", lineno + 1, other))
                 }
@@ -191,7 +193,7 @@ mod tests {
 
     #[test]
     fn unknown_type_errors() {
-        let r = Schema::parse("FOO optional float\n");
+        let r = Schema::parse("FOO optional floaty\n");
         assert!(r.is_err());
     }
 
@@ -226,14 +228,15 @@ mod tests {
         assert!(Schema::parse("FLAG optional bool definitely\n").is_err());
         assert!(Schema::parse("N optional int x\n").is_err());
         assert!(Schema::parse("URL optional url example.com\n").is_err());
+        assert!(Schema::parse("F optional float not-a-float\n").is_err());
     }
 
     #[test]
     fn valid_type_default_accepted() {
         let s = Schema::parse(
-            "PORT optional port 8080\nFLAG optional bool false\nN optional int 42\nURL optional url https://example.com/path\n",
+            "PORT optional port 8080\nFLAG optional bool false\nN optional int 42\nURL optional url https://example.com/path\nF optional float 3.14\n",
         )
         .unwrap();
-        assert_eq!(s.vars.len(), 4);
+        assert_eq!(s.vars.len(), 5);
     }
 }

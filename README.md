@@ -8,7 +8,7 @@ loads values from a `.env` file, and applies defaults.
 ## Features
 
 - Required and optional variables
-- Type checking: `string`, `int`, `bool`, `url`, `port`
+- Type checking: `string`, `int`, `bool`, `url`, `port`, `float`
 - Default values for optional variables
 - Default values are type-checked when the schema is parsed
 - Loads `.env` files (with optional `export` prefix and quoted values)
@@ -28,6 +28,7 @@ PORT optional port 8080
 DEBUG optional bool false
 API_KEY required string
 MAX_RETRIES optional int 3
+THRESHOLD optional float 0.5
 ```
 
 Lines starting with `#` and blank lines are ignored. Inline comments (a `#`

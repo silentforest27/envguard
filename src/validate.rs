@@ -130,6 +130,15 @@ pub fn check_type(ty: &VarType, value: &str) -> Result<(), String> {
                 Err(format!("invalid value {:?}: expected port (1-65535)", value))
             }
         }
+        VarType::Float => {
+            if value.is_empty()
+                || value.contains(char::is_whitespace)
+                || !value.parse::<f64>().map(|n| n.is_finite()).unwrap_or(false)
+            {
+                return Err(format!("invalid value {:?}: expected float", value));
+            }
+            Ok(())
+        }
     }
 }
 
@@ -285,6 +294,21 @@ B required bool"#).unwrap();
         env.insert("D".into(), "https://x/y".into());
         env.insert("B".into(), "true".into());
         assert!(validate(&s, &env).is_empty());
+    }
+
+    #[test]
+    fn float_ok_and_invalid() {
+        let s = Schema::parse("F required float").unwrap();
+        for value in ["3.14", "-2.5", "1e3"] {
+            let mut env = BTreeMap::new();
+            env.insert("F".into(), value.into());
+            assert!(validate(&s, &env).is_empty(), "{} should be valid", value);
+        }
+        for value in ["", "abc", "NaN", "inf"] {
+            let mut env = BTreeMap::new();
+            env.insert("F".into(), value.into());
+            assert!(!validate(&s, &env).is_empty(), "{} should be invalid", value);
+        }
     }
 
     #[test]
